@@ -225,7 +225,7 @@ func (c *Controller) Redirect(val interface{}, args ...interface{}) Result {
 		}
 		return &RedirectToUrlResult{fmt.Sprintf(url, args...)}
 	}
-	return &RedirectToActionResult{val}
+	return &RedirectToActionResult{val, args}
 }
 
 // Perform a message lookup for the given message name using the given arguments

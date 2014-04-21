@@ -306,10 +306,11 @@ func (r *RedirectToUrlResult) Apply(req *Request, resp *Response) {
 
 type RedirectToActionResult struct {
 	val interface{}
+	args []interface{}
 }
 
 func (r *RedirectToActionResult) Apply(req *Request, resp *Response) {
-	url, err := getRedirectUrl(r.val)
+	url, err := getRedirectUrl(r.val, r.args...)
 	if err != nil {
 		ERROR.Println("Couldn't resolve redirect:", err.Error())
 		ErrorResult{Error: err}.Apply(req, resp)
@@ -319,7 +320,7 @@ func (r *RedirectToActionResult) Apply(req *Request, resp *Response) {
 	resp.WriteHeader(http.StatusFound, "")
 }
 
-func getRedirectUrl(item interface{}) (string, error) {
+func getRedirectUrl(item interface{}, args ...interface{}) (string, error) {
 	// Handle strings
 	if url, ok := item.(string); ok {
 		return url, nil
@@ -341,7 +342,20 @@ func getRedirectUrl(item interface{}) (string, error) {
 			recvType = recvType.Elem()
 		}
 		action := recvType.Name() + "." + method.Name
-		actionDef := MainRouter.Reverse(action, make(map[string]string))
+
+		// Look up the types.
+		var c Controller
+		if err := c.SetAction(recvType.Name(), method.Name); err != nil {
+			return "", fmt.Errorf("reversing %s: %s", action, err)
+		}
+
+		// Unbind the arguments.
+		argsByName := make(map[string]string)
+		for i, argValue := range args {
+			Unbind(argsByName, c.MethodType.Args[i].Name, argValue)
+		}
+
+		actionDef := MainRouter.Reverse(action, argsByName)
 		if actionDef == nil {
 			return "", errors.New("no route for action " + action)
 		}
